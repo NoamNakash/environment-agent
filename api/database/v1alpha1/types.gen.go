@@ -9,21 +9,6 @@ import (
 	"time"
 )
 
-// Defines values for DatabaseServiceType.
-const (
-	DatabaseServiceTypeDatabase DatabaseServiceType = "database"
-)
-
-// Valid indicates whether the value is a known member of the DatabaseServiceType enum.
-func (e DatabaseServiceType) Valid() bool {
-	switch e {
-	case DatabaseServiceTypeDatabase:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for DatabaseEngine.
 const (
 	Postgresql DatabaseEngine = "postgresql"
@@ -165,9 +150,6 @@ type Database struct {
 	// Example: databases/my-database
 	Path *string `json:"path,omitempty"`
 
-	// ServiceType Service type identifier
-	ServiceType *DatabaseServiceType `json:"service_type,omitempty"`
-
 	// Spec Database specification with input fields for creation
 	Spec   DatabaseSpec    `json:"spec"`
 	Status *DatabaseStatus `json:"status,omitempty"`
@@ -175,9 +157,6 @@ type Database struct {
 	// UpdateTime Timestamp when the database was last updated
 	UpdateTime *time.Time `json:"update_time,omitempty"`
 }
-
-// DatabaseServiceType Service type identifier
-type DatabaseServiceType string
 
 // DatabaseCpu CPU allocation for each replica in cores or millicores (e.g., "2", "500m")
 type DatabaseCpu struct {

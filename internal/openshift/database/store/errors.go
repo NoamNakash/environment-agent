@@ -8,7 +8,7 @@ type NotFoundError struct {
 }
 
 func (e *NotFoundError) Error() string {
-	return fmt.Sprintf("container %q not found", e.ID)
+	return fmt.Sprintf("database %q not found", e.ID)
 }
 
 // ConflictError indicates a resource conflict (e.g., duplicate instance ID).

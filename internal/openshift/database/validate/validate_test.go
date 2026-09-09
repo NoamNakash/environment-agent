@@ -4,28 +4,28 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	containerapi "github.com/dcm-project/environment-agent/api/database/v1alpha1"
+	databaseapi "github.com/dcm-project/environment-agent/api/database/v1alpha1"
 	"github.com/dcm-project/environment-agent/internal/openshift/database/dcm"
 	"github.com/dcm-project/environment-agent/internal/openshift/database/store"
 	"github.com/dcm-project/environment-agent/internal/openshift/database/validate"
 )
 
 var _ = Describe("ValidateCreate", func() {
-	validSpec := func() containerapi.DatabaseSpec {
-		return containerapi.DatabaseSpec{
-			Metadata: containerapi.DatabaseMetadata{Name: "my-container"},
-			Resources: containerapi.DatabaseResources{
-				Cpu:    containerapi.DatabaseCpu{Min: "1", Max: "2"},
-				Memory: containerapi.DatabaseMemory{Min: "1GB", Max: "2GB"},
+	validSpec := func() databaseapi.DatabaseSpec {
+		return databaseapi.DatabaseSpec{
+			Metadata: databaseapi.DatabaseMetadata{Name: "my-database"},
+			Resources: databaseapi.DatabaseResources{
+				Cpu:    databaseapi.DatabaseCpu{Min: "1", Max: "2"},
+				Memory: databaseapi.DatabaseMemory{Min: "1GB", Max: "2GB"},
 			},
 		}
 	}
 
 	It("accepts a valid spec", func() {
-		Expect(validate.ValidateCreate("container-1", validSpec())).To(Succeed())
+		Expect(validate.ValidateCreate("database-1", validSpec())).To(Succeed())
 	})
 
-	It("rejects reserved container ID health", func() {
+	It("rejects reserved database ID health", func() {
 		err := validate.ValidateCreate("health", validSpec())
 		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
 		Expect(err.Error()).To(ContainSubstring("reserved"))
@@ -33,8 +33,8 @@ var _ = Describe("ValidateCreate", func() {
 
 	It("rejects cpu.min greater than cpu.max", func() {
 		spec := validSpec()
-		spec.Resources.Cpu = containerapi.DatabaseCpu{Min: "400m", Max: "1"}
-		err := validate.ValidateCreate("container-1", spec)
+		spec.Resources.Cpu = databaseapi.DatabaseCpu{Min: "10", Max: "2000m"}
+		err := validate.ValidateCreate("database-1", spec)
 		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
 		Expect(err.Error()).To(ContainSubstring("cpu.min"))
 	})
@@ -42,7 +42,7 @@ var _ = Describe("ValidateCreate", func() {
 	It("rejects invalid memory format", func() {
 		spec := validSpec()
 		spec.Resources.Memory.Min = "not-memory"
-		err := validate.ValidateCreate("container-1", spec)
+		err := validate.ValidateCreate("database-1", spec)
 		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
 		Expect(err.Error()).To(ContainSubstring("memory.min"))
 	})
@@ -51,7 +51,7 @@ var _ = Describe("ValidateCreate", func() {
 		spec := validSpec()
 		labels := map[string]string{dcm.LabelManagedBy: "user"}
 		spec.Metadata.Labels = &labels
-		err := validate.ValidateCreate("container-1", spec)
+		err := validate.ValidateCreate("database-1", spec)
 		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
 		Expect(err.Error()).To(ContainSubstring("reserved by DCM"))
 	})

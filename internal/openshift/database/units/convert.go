@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// ConvertCPU converts a ContainerCpu spec to Kubernetes resource quantities
+// ConvertCPU converts a DatabaseCpu spec to Kubernetes resource quantities
 // for requests and limits.
 func ConvertCPU(cpu v1alpha1.DatabaseCpu) (requests, limits resource.Quantity) {
 	requests = resource.MustParse(cpu.Min)
@@ -19,9 +19,12 @@ func ConvertCPU(cpu v1alpha1.DatabaseCpu) (requests, limits resource.Quantity) {
 
 // apiToK8s maps API memory units to Kubernetes binary units.
 var apiToK8s = map[string]string{
-	"MB": "Mi",
-	"GB": "Gi",
-	"TB": "Ti",
+	"MB":  "Mi",
+	"GB":  "Gi",
+	"TB":  "Ti",
+	"MiB": "Mi",
+	"GiB": "Gi",
+	"TiB": "Ti",
 }
 
 // k8sToAPI maps Kubernetes binary memory suffixes back to API units.

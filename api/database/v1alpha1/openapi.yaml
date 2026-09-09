@@ -486,10 +486,6 @@ components:
           readOnly: true
           description: Resource path identifier
           example: "databases/my-database"
-        service_type:
-          type: string
-          description: Service type identifier
-          enum: [database]
         spec:
           $ref: '#/components/schemas/DatabaseSpec'
         status:

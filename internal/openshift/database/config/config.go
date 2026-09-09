@@ -18,6 +18,7 @@ type Config struct {
 	DefaultStorageClass string        `env:"SP_DATABASE_DEFAULT_STORAGE_CLASS"`
 	ImageCatalog        string        `env:"SP_DATABASE_IMAGE_CATALOG"`
 	ExternalServiceType string        `env:"SP_DATABASE_EXTERNAL_SVC_TYPE"` // Must be NodePort or LoadBalancer
+	DefaultVersion      int           `env:"SP_DATABASE_DEFAULT_VERSION" envDefault:"18"`
 	DebounceMs          int           `env:"SP_MONITOR_DEBOUNCE_MS"   envDefault:"500"`
 	ResyncPeriod        time.Duration `env:"SP_MONITOR_RESYNC_PERIOD" envDefault:"10m"`
 	PublishMaxAttempts  int           `env:"SP_MONITOR_PUBLISH_MAX_ATTEMPTS" envDefault:"5"`

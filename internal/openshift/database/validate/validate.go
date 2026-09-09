@@ -1,10 +1,12 @@
-// Package validate provides request validation for container create operations.
+// Package validate provides request validation for database create operations.
 package validate
 
 import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/dcm-project/environment-agent/api/database/v1alpha1"
 	"github.com/dcm-project/environment-agent/internal/openshift/database/dcm"
@@ -18,10 +20,11 @@ type validationError struct {
 }
 
 const (
-	ptrContainerID = "#/spec/id"
-	ptrCPUMin      = "#/spec/resources/cpu/min"
-	ptrMemMin      = "#/spec/resources/memory/min"
-	ptrMemMax      = "#/spec/resources/memory/max"
+	ptrDatabaseID = "#/spec/id"
+	ptrCPUMin     = "#/spec/resources/cpu/min"
+	ptrCPUMax     = "#/spec/resources/cpu/max"
+	ptrMemMin     = "#/spec/resources/memory/min"
+	ptrMemMax     = "#/spec/resources/memory/max"
 )
 
 func jsonPointerEscape(s string) string {
@@ -34,11 +37,11 @@ func labelPointer(key string) string {
 	return "#/spec/metadata/labels/" + jsonPointerEscape(key)
 }
 
-func checkContainerID(id string) *validationError {
+func checkDatabaseID(id string) *validationError {
 	if id == "health" {
 		return &validationError{
-			Detail:  fmt.Sprintf("container ID %q is reserved and cannot be used", id),
-			Pointer: ptrContainerID,
+			Detail:  fmt.Sprintf("database ID %q is reserved and cannot be used", id),
+			Pointer: ptrDatabaseID,
 		}
 	}
 	return nil
@@ -47,7 +50,21 @@ func checkContainerID(id string) *validationError {
 func checkResources(res v1alpha1.DatabaseResources) []validationError {
 	var errs []validationError
 
-	if res.Cpu.Min > res.Cpu.Max {
+	minCPU, minCPUErr := resource.ParseQuantity(res.Cpu.Min)
+	if minCPUErr != nil {
+		errs = append(errs, validationError{
+			Detail:  fmt.Sprintf("invalid cpu.min %q: %v", res.Cpu.Min, minCPUErr),
+			Pointer: ptrCPUMin,
+		})
+	}
+	maxCPU, maxCPUErr := resource.ParseQuantity(res.Cpu.Max)
+	if maxCPUErr != nil {
+		errs = append(errs, validationError{
+			Detail:  fmt.Sprintf("invalid cpu.max %q: %v", res.Cpu.Max, maxCPUErr),
+			Pointer: ptrCPUMax,
+		})
+	}
+	if len(errs) == 0 && minCPU.Cmp(maxCPU) > 0 {
 		errs = append(errs, validationError{
 			Detail:  fmt.Sprintf("cpu.min (%s) must not exceed cpu.max (%s)", res.Cpu.Min, res.Cpu.Max),
 			Pointer: ptrCPUMin,
@@ -101,9 +118,9 @@ func checkUserLabels(labels *map[string]string) []validationError {
 	return errs
 }
 
-// ValidateCreate checks container ID, resource ranges, memory format, and reserved labels.
+// ValidateCreate checks Database ID, resource ranges, memory format, and reserved labels.
 func ValidateCreate(id string, spec v1alpha1.DatabaseSpec) error {
-	if err := checkContainerID(id); err != nil {
+	if err := checkDatabaseID(id); err != nil {
 		return &store.InvalidArgumentError{Message: err.Detail}
 	}
 

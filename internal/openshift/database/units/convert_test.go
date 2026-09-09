@@ -52,6 +52,9 @@ var _ = Describe("ConvertMemory", func() {
 		Entry("gigabytes", "2GB", "2Gi"),
 		Entry("terabytes", "1TB", "1Ti"),
 		Entry("fractional gigabytes", "1GB", "1Gi"),
+		Entry("mebibytes", "512MiB", "512Mi"),
+		Entry("gibibytes", "2GiB", "2Gi"),
+		Entry("tebibytes", "1TiB", "1Ti"),
 	)
 
 	DescribeTable("rejects invalid memory strings",

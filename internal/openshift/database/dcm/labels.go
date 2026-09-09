@@ -36,7 +36,7 @@ func InstanceSelector(instanceID string) string {
 	}.String()
 }
 
-// Selector returns a label selector string matching all DCM-managed containers.
+// Selector returns a label selector string matching all DCM-managed databases.
 func Selector() string {
 	return labels.Set{
 		LabelManagedBy:   ValueManagedByDCM,
