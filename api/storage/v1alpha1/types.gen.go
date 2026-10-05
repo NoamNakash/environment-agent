@@ -161,7 +161,7 @@ type Health struct {
 
 	// Type Resource type identifier
 	//
-	// Example: k8s-storage-service-provider.dcm.io/health
+	// Example: storage-service-provider.dcm.io/health
 	Type *string `json:"type,omitempty"`
 
 	// Uptime Seconds since the service provider started
@@ -175,30 +175,42 @@ type Health struct {
 	Version *string `json:"version,omitempty"`
 }
 
-// KubernetesProviderHints Kubernetes-specific PVC settings
+// KubernetesProviderHints Kubernetes-specific PVC settings supplied under
+// provider_hints.kubernetes.
+//
+// Catalog administrators typically set these as non-editable defaults.
 type KubernetesProviderHints struct {
-	// AccessMode PVC access mode. Controls attachment scope and permissions at creation
-	// time (Kubernetes-specific; see service type definitions).
+	// AccessMode PVC access mode supplied under provider_hints.kubernetes.
+	//
+	// ReadWriteOnce is typical for block storage; ReadWriteMany for
+	// shared filesystem StorageClasses (e.g. CephFS, NFS).
 	//
 	//
 	// Example: ReadWriteOnce
 	AccessMode *VolumeAccessMode `json:"access_mode,omitempty"`
 
 	// StorageClass StorageClass name (overrides SP default)
+	//
+	// Example: gp3-csi
 	StorageClass *string `json:"storage_class,omitempty"`
 
-	// VolumeMode PVC volume mode
+	// VolumeMode PVC volume mode supplied under provider_hints.kubernetes
+	//
+	// Example: Filesystem
 	VolumeMode *VolumeMode `json:"volume_mode,omitempty"`
 }
 
 // ProviderHints Provider-specific hints from the catalog
 type ProviderHints struct {
-	// Kubernetes Kubernetes-specific PVC settings
+	// Kubernetes Kubernetes-specific PVC settings supplied under
+	// provider_hints.kubernetes.
+	//
+	// Catalog administrators typically set these as non-editable defaults.
 	Kubernetes           *KubernetesProviderHints `json:"kubernetes,omitempty"`
 	AdditionalProperties map[string]interface{}   `json:"-"`
 }
 
-// StorageSpec Storage specification for creating a PVC (implements the portable storage service type)
+// StorageSpec Storage specification for creating a volume (implements the portable storage service type)
 type StorageSpec struct {
 	// Capacity Requested storage capacity (e.g., "100Gi")
 	//
@@ -221,7 +233,7 @@ type StorageSpecServiceType string
 // StorageStatus Current status of the storage instance (CloudEvents payload uses this enum)
 type StorageStatus string
 
-// Volume Volume resource representing a PVC instance
+// Volume Volume resource representing a storage instance
 type Volume struct {
 	// CreateTime Timestamp when the volume was created
 	CreateTime *time.Time `json:"create_time,omitempty"`
@@ -236,7 +248,7 @@ type Volume struct {
 	// Example: volumes/app-data-volume
 	Path *string `json:"path,omitempty"`
 
-	// Spec Storage specification for creating a PVC (implements the portable storage service type)
+	// Spec Storage specification for creating a volume (implements the portable storage service type)
 	Spec   StorageSpec    `json:"spec"`
 	Status *StorageStatus `json:"status,omitempty"`
 
@@ -244,8 +256,10 @@ type Volume struct {
 	UpdateTime *time.Time `json:"update_time,omitempty"`
 }
 
-// VolumeAccessMode PVC access mode. Controls attachment scope and permissions at creation
-// time (Kubernetes-specific; see service type definitions).
+// VolumeAccessMode PVC access mode supplied under provider_hints.kubernetes.
+//
+// ReadWriteOnce is typical for block storage; ReadWriteMany for
+// shared filesystem StorageClasses (e.g. CephFS, NFS).
 //
 // Example: ReadWriteOnce
 type VolumeAccessMode string
@@ -262,20 +276,22 @@ type VolumeMetadata struct {
 	// Labels Custom key-value pairs for tagging and filtering
 	Labels *map[string]string `json:"labels,omitempty"`
 
-	// Name DCM instance ID and Kubernetes PVC name (AEP-122)
+	// Name DCM instance ID (AEP-122)
 	Name string `json:"name"`
 
-	// Namespace Kubernetes namespace where the PVC was created
+	// Namespace Platform namespace where the volume was created
 	Namespace *string `json:"namespace,omitempty"`
 
-	// StorageClass StorageClass name bound to the PVC
+	// StorageClass Storage class name bound to the volume
 	StorageClass *string `json:"storage_class,omitempty"`
 
-	// VolumeName Bound PersistentVolume name when available
+	// VolumeName Bound backend volume name when available
 	VolumeName *string `json:"volume_name,omitempty"`
 }
 
-// VolumeMode PVC volume mode
+// VolumeMode PVC volume mode supplied under provider_hints.kubernetes
+//
+// Example: Filesystem
 type VolumeMode string
 
 // VolumeIdPath defines model for VolumeIdPath.

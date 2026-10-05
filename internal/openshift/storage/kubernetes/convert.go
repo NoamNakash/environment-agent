@@ -106,12 +106,12 @@ func volumeFromPVC(pvc *corev1.PersistentVolumeClaim, instanceID string) v1alpha
 func buildPVC(spec v1alpha1.StorageSpec, cfg K8sConfig, labels map[string]string) (*corev1.PersistentVolumeClaim, error) {
 	qty, err := resource.ParseQuantity(spec.Capacity)
 	if err != nil {
-		return nil, &store.InvalidArgumentError{Message: fmt.Sprintf("invalid capacity %q: %v", spec.Capacity, err)}
+		return nil, &store.InvalidArgumentError{Message: fmt.Sprintf("invalid capacity %q", spec.Capacity), Err: err}
 	}
 
 	accessMode, err := resolveAccessMode(spec, cfg.DefaultAccessMode)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("resolving access mode: %w", err)
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{
@@ -139,7 +139,7 @@ func buildPVC(spec v1alpha1.StorageSpec, cfg K8sConfig, labels map[string]string
 		if vm := spec.ProviderHints.Kubernetes.VolumeMode; vm != nil {
 			mode, err := resolveVolumeMode(*vm)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("resolving volume mode: %w", err)
 			}
 			pvc.Spec.VolumeMode = &mode
 		}
