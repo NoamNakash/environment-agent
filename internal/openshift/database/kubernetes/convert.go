@@ -21,7 +21,6 @@ import (
 
 const (
 	engine                             = "postgresql"
-	postgresLatest                     = "latest"
 	port                               = 5432 // As of it right now, it is not possible to reconfigure cnpg's port
 	imageRepo                          = "ghcr.io/cloudnative-pg/postgresql"
 	imageType                          = "standard"
