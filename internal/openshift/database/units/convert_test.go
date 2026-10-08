@@ -41,7 +41,7 @@ var _ = Describe("ConvertCPU", func() {
 var _ = Describe("ConvertMemory", func() {
 	DescribeTable("converts valid memory strings",
 		func(input string, expectedK8s string) {
-			q, err := units.ConvertMemory(input)
+			q, err := units.ConvertBytes(input)
 			Expect(err).NotTo(HaveOccurred())
 
 			expected, parseErr := resource.ParseQuantity(expectedK8s)
@@ -59,7 +59,7 @@ var _ = Describe("ConvertMemory", func() {
 
 	DescribeTable("rejects invalid memory strings",
 		func(input string) {
-			_, err := units.ConvertMemory(input)
+			_, err := units.ConvertBytes(input)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("unsupported memory unit"))
 		},
@@ -75,7 +75,7 @@ var _ = Describe("MemoryQuantityToAPI", func() {
 		func(k8sStr string, expectedAPI string) {
 			q, err := resource.ParseQuantity(k8sStr)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(units.MemoryQuantityToAPI(q)).To(Equal(expectedAPI))
+			Expect(units.BytesQuantityToAPI(q)).To(Equal(expectedAPI))
 		},
 		Entry("mebibytes to megabytes", "512Mi", "512MB"),
 		Entry("gibibytes to gigabytes", "2Gi", "2GB"),
@@ -85,7 +85,7 @@ var _ = Describe("MemoryQuantityToAPI", func() {
 	It("falls back to raw string for unrecognized suffix", func() {
 		q, err := resource.ParseQuantity("1Ki")
 		Expect(err).NotTo(HaveOccurred())
-		result := units.MemoryQuantityToAPI(q)
+		result := units.BytesQuantityToAPI(q)
 		Expect(result).To(Equal(q.String()))
 	})
 })
