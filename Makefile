@@ -189,7 +189,13 @@ generate-database-types:
 		-o api/database/v1alpha1/types.gen.go \
 		api/database/v1alpha1/openapi.yaml
 
-generate-database-api: generate-database-types
+generate-database-spec:
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen \
+		--config=api/database/v1alpha1/spec.gen.cfg \
+		-o api/database/v1alpha1/spec.gen.go \
+		api/database/v1alpha1/openapi.yaml
+
+generate-database-api: generate-database-types generate-database-spec
 
 generate-network-types:
 	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen \
@@ -198,20 +204,6 @@ generate-network-types:
 		api/network/v1alpha1/openapi.yaml
 
 generate-network-api: generate-network-types
-
-generate-database-types:
-	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen \
-		--config=api/database/v1alpha1/types.gen.cfg \
-		-o api/database/v1alpha1/types.gen.go \
-		api/database/v1alpha1/openapi.yaml
-
-generate-database-spec:
-	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen \
-		--config=api/database/v1alpha1/spec.gen.cfg \
-		-o api/database/v1alpha1/spec.gen.go \
-		api/database/v1alpha1/openapi.yaml
-
-generate-database-api: generate-database-types generate-database-spec
 
 bundle-vm-openapi:
 	@echo "Bundling VM OpenAPI specification..."

@@ -38,7 +38,7 @@ func (s *CnpgDatabaseStore) Delete(ctx context.Context, databaseId string) error
 	// client disconnects after the Service is gone
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer cancel()
-	if err := s.dynamicClient.Resource(clustersResource).Namespace(s.cfg.Namespace).Delete(cleanupCtx, cluster.Name, deleteOptions); err != nil {
+	if err := s.dynamicClient.Resource(ClustersResource).Namespace(s.cfg.Namespace).Delete(cleanupCtx, cluster.Name, deleteOptions); err != nil {
 		return fmt.Errorf("deleting cluster for database %q: %w", databaseId, err)
 	}
 	return nil

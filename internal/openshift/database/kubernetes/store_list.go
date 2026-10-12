@@ -28,7 +28,7 @@ func (s *CnpgDatabaseStore) List(ctx context.Context, maxPageSize int32, pageTok
 		return nil, err
 	}
 
-	clustersUnstructued, err := s.dynamicClient.Resource(clustersResource).Namespace(s.cfg.Namespace).List(ctx, metav1.ListOptions{
+	clustersUnstructued, err := s.dynamicClient.Resource(ClustersResource).Namespace(s.cfg.Namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: dcmSelector(),
 	})
 	if err != nil {
