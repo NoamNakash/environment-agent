@@ -34,9 +34,9 @@ var k8sToAPI = map[string]string{
 	"Ti": "TB",
 }
 
-// ConvertMemory converts a memory string (e.g., "1GB") to a Kubernetes
+// ConvertBytes converts a bytes quantity string (e.g., "1GB") to a Kubernetes
 // resource quantity.
-func ConvertMemory(memoryStr string) (resource.Quantity, error) {
+func ConvertBytes(memoryStr string) (resource.Quantity, error) {
 	for suffix, k8sUnit := range apiToK8s {
 		if numStr, ok := strings.CutSuffix(memoryStr, suffix); ok {
 			return resource.ParseQuantity(numStr + k8sUnit)
@@ -45,10 +45,10 @@ func ConvertMemory(memoryStr string) (resource.Quantity, error) {
 	return resource.Quantity{}, fmt.Errorf("unsupported memory unit in %q", memoryStr)
 }
 
-// MemoryQuantityToAPI converts a Kubernetes resource.Quantity to an API memory
-// string (e.g., "1Gi" → "1GB"). Falls back to the raw quantity string if the
-// suffix is not recognized.
-func MemoryQuantityToAPI(q resource.Quantity) string {
+// BytesQuantityToAPI converts a Kubernetes resource.Quantity to an API bytes
+// quantity string (e.g., "1Gi" → "1GB"). Falls back to the raw quantity string
+// if the suffix is not recognized.
+func BytesQuantityToAPI(q resource.Quantity) string {
 	s := q.String()
 	for k8sSuffix, apiUnit := range k8sToAPI {
 		if numStr, ok := strings.CutSuffix(s, k8sSuffix); ok {

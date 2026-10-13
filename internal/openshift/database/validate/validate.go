@@ -6,12 +6,11 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	"github.com/dcm-project/environment-agent/api/database/v1alpha1"
 	"github.com/dcm-project/environment-agent/internal/openshift/database/dcm"
 	"github.com/dcm-project/environment-agent/internal/openshift/database/store"
 	"github.com/dcm-project/environment-agent/internal/openshift/database/units"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 type validationError struct {
@@ -71,14 +70,14 @@ func checkResources(res v1alpha1.DatabaseResources) []validationError {
 		})
 	}
 
-	minMem, minErr := units.ConvertMemory(res.Memory.Min)
+	minMem, minErr := units.ConvertBytes(res.Memory.Min)
 	if minErr != nil {
 		errs = append(errs, validationError{
 			Detail:  fmt.Sprintf("invalid memory.min %q: %v", res.Memory.Min, minErr),
 			Pointer: ptrMemMin,
 		})
 	}
-	maxMem, maxErr := units.ConvertMemory(res.Memory.Max)
+	maxMem, maxErr := units.ConvertBytes(res.Memory.Max)
 	if maxErr != nil {
 		errs = append(errs, validationError{
 			Detail:  fmt.Sprintf("invalid memory.max %q: %v", res.Memory.Max, maxErr),
