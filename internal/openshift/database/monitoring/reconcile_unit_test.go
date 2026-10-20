@@ -283,8 +283,6 @@ var _ = Describe("Status Reconciliation", func() {
 
 		It("should return FAILED when one replica succeeded and another failed", func() {
 			// A Succeeded pod has no mapped phase (MapReplicaStatus returns ok=false).
-			// The early-return bug would cause the failed replica's status to be
-			// silently dropped. The loop must continue past unmapped replicas.
 			cluster := buildCluster(cnpgv1.PhaseHealthy, 2, readyCluster)
 			pods := []*corev1.Pod{
 				buildNamedPod("pod-1", corev1.PodSucceeded),
@@ -413,6 +411,32 @@ var _ = Describe("Status Reconciliation", func() {
 		Expect(publish).To(BeTrue())
 		Expect(status).To(Equal(v1alpha1.FAILED))
 		Expect(message).To(Equal("cluster hibernating"))
+	})
+
+	It("should return PENDING (not FAILED) when a container is in ContainerCreating state", func() {
+		cluster := buildCluster(string(cnpgv1.PhaseWaitingForInstancesToBeActive), 1, notReadyCluster)
+		pod := buildPodWithContainerStatuses(corev1.PodPending,
+			corev1.ContainerStatus{Name: "app", State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ContainerCreating"}}},
+		)
+
+		status, _, publish := monitoring.ReconcileStatus(cluster, []*corev1.Pod{pod}, nil)
+
+		Expect(publish).To(BeTrue())
+		Expect(status).To(Equal(v1alpha1.PENDING))
+		Expect(status).NotTo(Equal(v1alpha1.FAILED))
+	})
+
+	It("should return PENDING (not FAILED) when a container is in PodInitializing state", func() {
+		cluster := buildCluster(string(cnpgv1.PhaseWaitingForInstancesToBeActive), 1, notReadyCluster)
+		pod := buildPodWithContainerStatuses(corev1.PodPending,
+			corev1.ContainerStatus{Name: "app", State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "PodInitializing"}}},
+		)
+
+		status, _, publish := monitoring.ReconcileStatus(cluster, []*corev1.Pod{pod}, nil)
+
+		Expect(publish).To(BeTrue())
+		Expect(status).To(Equal(v1alpha1.PENDING))
+		Expect(status).NotTo(Equal(v1alpha1.FAILED))
 	})
 
 	It("should surface container waiting failures on a scheduled Pending pod", func() {

@@ -59,17 +59,20 @@ func (e DatabaseSpecServiceType) Valid() bool {
 
 // Defines values for DatabaseStatus.
 const (
-	DELETED DatabaseStatus = "DELETED"
-	FAILED  DatabaseStatus = "FAILED"
-	PENDING DatabaseStatus = "PENDING"
-	RUNNING DatabaseStatus = "RUNNING"
-	UNKNOWN DatabaseStatus = "UNKNOWN"
+	DELETED  DatabaseStatus = "DELETED"
+	DELETING DatabaseStatus = "DELETING"
+	FAILED   DatabaseStatus = "FAILED"
+	PENDING  DatabaseStatus = "PENDING"
+	RUNNING  DatabaseStatus = "RUNNING"
+	UNKNOWN  DatabaseStatus = "UNKNOWN"
 )
 
 // Valid indicates whether the value is a known member of the DatabaseStatus enum.
 func (e DatabaseStatus) Valid() bool {
 	switch e {
 	case DELETED:
+		return true
+	case DELETING:
 		return true
 	case FAILED:
 		return true

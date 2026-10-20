@@ -20,10 +20,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const instanceIDIndex = "instanceID"
+const resourceIdIndex = "resource_id"
 
 // StatusMonitor watches Cluster, PVC and Pod resources for DCM-managed
-// containers and publishes status change events via a StatusPublisher.
+// databases and publishes status change events via a StatusPublisher.
 type StatusMonitor struct {
 	// dependencies
 	client        kubernetes.Interface
@@ -86,26 +86,22 @@ func (m *StatusMonitor) Start(ctx context.Context) error {
 	podInformer := factory.Core().V1().Pods().Informer()
 	pvcInformer := factory.Core().V1().PersistentVolumeClaims().Informer()
 
-	if err := clusterInformer.AddIndexers(cache.Indexers{instanceIDIndex: InstanceIDIndexFunc}); err != nil {
+	if err := clusterInformer.AddIndexers(cache.Indexers{resourceIdIndex: InstanceIDIndexFunc}); err != nil {
 		return fmt.Errorf("adding cluster indexer: %w", err)
 	}
-	if err := podInformer.AddIndexers(cache.Indexers{instanceIDIndex: InstanceIDIndexFunc}); err != nil {
+	if err := podInformer.AddIndexers(cache.Indexers{resourceIdIndex: InstanceIDIndexFunc}); err != nil {
 		return fmt.Errorf("adding pod indexer: %w", err)
 	}
-	if err := pvcInformer.AddIndexers(cache.Indexers{instanceIDIndex: InstanceIDIndexFunc}); err != nil {
+	if err := pvcInformer.AddIndexers(cache.Indexers{resourceIdIndex: InstanceIDIndexFunc}); err != nil {
 		return fmt.Errorf("adding pvc indexer: %w", err)
 	}
 
-	// publishCtx is independent of the monitor context so that events still
-	// pending in the debouncer when ctx is cancelled can be flushed during
-	// the bounded shutdown phase (see debouncer.Stop and defer order below).
-	publishCtx, cancelPublish := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancelPublish() // registered first → runs LAST (LIFO), after debouncer.Stop
-
 	debouncer := NewDebouncer(
 		time.Duration(m.cfg.DebounceMs)*time.Millisecond,
-		func(event StatusEvent) {
-			m.publishWithRetry(publishCtx, event)
+		func(event StatusEvent) bool {
+			publishCtx, cancel := context.WithTimeout(context.Background(), m.publishTimeout())
+			defer cancel()
+			return m.publishWithRetry(publishCtx, event)
 		},
 	)
 
@@ -161,18 +157,24 @@ func (m *StatusMonitor) Start(ctx context.Context) error {
 	defer dynamicfactory.Shutdown()
 	defer debouncer.Stop()
 
+	if ctx.Err() != nil {
+		return nil
+	}
+
 	synced := factory.WaitForCacheSync(ctx.Done())
-	if ctx.Err() == nil {
-		for typ, ok := range synced {
-			if !ok {
-				m.logger.Error("cache sync failed, aborting start", "type", typ)
-				return fmt.Errorf("cache sync failed for %v", typ)
-			}
+	if ctx.Err() != nil {
+		return nil
+	}
+	for typ, ok := range synced {
+		if !ok {
+			return fmt.Errorf("cache sync failed for %v", typ)
 		}
-		if ok := cache.WaitForCacheSync(ctx.Done(), clusterInformer.HasSynced); !ok {
-			m.logger.Error("cache sync failed, aborting start", "type", "clusters")
-			return fmt.Errorf("cache sync failed for %v", "clusters")
+	}
+	if ok := cache.WaitForCacheSync(ctx.Done(), clusterInformer.HasSynced); !ok {
+		if ctx.Err() != nil {
+			return nil
 		}
+		return fmt.Errorf("cache sync failed for clusters")
 	}
 
 	// All three caches are now warm. Open the publication gate and reconcile
@@ -285,7 +287,14 @@ func reconcileAndSubmit(instanceID string, cluster *cnpgv1.Cluster, pods []*core
 	}
 }
 
-func (m *StatusMonitor) publishWithRetry(ctx context.Context, event StatusEvent) {
+func (m *StatusMonitor) publishTimeout() time.Duration {
+	if m.cfg.PublishTimeoutSeconds > 0 {
+		return time.Duration(m.cfg.PublishTimeoutSeconds) * time.Second
+	}
+	return 30 * time.Second
+}
+
+func (m *StatusMonitor) publishWithRetry(ctx context.Context, event StatusEvent) bool {
 	maxAttempts := m.cfg.PublishMaxAttempts
 	if maxAttempts <= 0 {
 		maxAttempts = 5
@@ -296,21 +305,22 @@ func (m *StatusMonitor) publishWithRetry(ctx context.Context, event StatusEvent)
 		if err := m.publisher.Publish(ctx, event); err != nil {
 			m.logger.Error("failed to publish status event",
 				"error", err,
-				"instanceID", event.InstanceID,
+				"resource_id", event.InstanceID,
 				"attempt", attempt,
 			)
 			if attempt < maxAttempts {
 				select {
 				case <-ctx.Done():
-					return
+					return false
 				case <-time.After(backoff):
 				}
 				backoff *= 2
 			}
 			continue
 		}
-		return
+		return true
 	}
+	return false
 }
 
 // sweepInstances reconciles every instance ID known across all three indexers.
@@ -318,13 +328,13 @@ func (m *StatusMonitor) publishWithRetry(ctx context.Context, event StatusEvent)
 // initial status for every managed database.
 func sweepInstances(clusterIndexer, podIndexer, pvcIndexer cache.Indexer, debouncer *Debouncer) {
 	seen := make(map[string]struct{})
-	for _, id := range clusterIndexer.ListIndexFuncValues(instanceIDIndex) {
+	for _, id := range clusterIndexer.ListIndexFuncValues(resourceIdIndex) {
 		seen[id] = struct{}{}
 	}
-	for _, id := range podIndexer.ListIndexFuncValues(instanceIDIndex) {
+	for _, id := range podIndexer.ListIndexFuncValues(resourceIdIndex) {
 		seen[id] = struct{}{}
 	}
-	for _, id := range pvcIndexer.ListIndexFuncValues(instanceIDIndex) {
+	for _, id := range pvcIndexer.ListIndexFuncValues(resourceIdIndex) {
 		seen[id] = struct{}{}
 	}
 	for instanceID := range seen {
@@ -336,7 +346,7 @@ func sweepInstances(clusterIndexer, podIndexer, pvcIndexer cache.Indexer, deboun
 }
 
 func lookupPodsByIndex(indexer cache.Indexer, instanceID string) []*corev1.Pod {
-	items, err := indexer.ByIndex(instanceIDIndex, instanceID)
+	items, err := indexer.ByIndex(resourceIdIndex, instanceID)
 	if err != nil || len(items) == 0 {
 		return nil
 	}
@@ -350,7 +360,7 @@ func lookupPodsByIndex(indexer cache.Indexer, instanceID string) []*corev1.Pod {
 }
 
 func lookupPvcsByIndex(indexer cache.Indexer, instanceID string) []*corev1.PersistentVolumeClaim {
-	items, err := indexer.ByIndex(instanceIDIndex, instanceID)
+	items, err := indexer.ByIndex(resourceIdIndex, instanceID)
 	if err != nil || len(items) == 0 {
 		return nil
 	}
@@ -364,7 +374,7 @@ func lookupPvcsByIndex(indexer cache.Indexer, instanceID string) []*corev1.Persi
 }
 
 func lookupClusterByIndex(indexer cache.Indexer, instanceID string) *cnpgv1.Cluster {
-	items, err := indexer.ByIndex(instanceIDIndex, instanceID)
+	items, err := indexer.ByIndex(resourceIdIndex, instanceID)
 	if err != nil || len(items) == 0 {
 		return nil
 	}

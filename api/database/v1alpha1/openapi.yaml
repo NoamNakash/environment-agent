@@ -310,6 +310,7 @@ components:
         - FAILED
         - UNKNOWN
         - DELETED
+        - DELETING
       description: Current status of the database instance
 
     DatabaseEngine:

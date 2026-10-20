@@ -25,6 +25,7 @@ var _ = Describe("Configuration", func() {
 		_ = os.Unsetenv("SP_MONITOR_DEBOUNCE_MS")
 		_ = os.Unsetenv("SP_MONITOR_RESYNC_PERIOD")
 		_ = os.Unsetenv("SP_MONITOR_PUBLISH_MAX_ATTEMPTS")
+		_ = os.Unsetenv("SP_MONITOR_PUBLISH_TIMEOUT_SECONDS")
 	}
 
 	BeforeEach(func() {
@@ -44,6 +45,7 @@ var _ = Describe("Configuration", func() {
 		_ = os.Setenv("SP_MONITOR_DEBOUNCE_MS", "250")
 		_ = os.Setenv("SP_MONITOR_RESYNC_PERIOD", "5m")
 		_ = os.Setenv("SP_MONITOR_PUBLISH_MAX_ATTEMPTS", "10")
+		_ = os.Setenv("SP_MONITOR_PUBLISH_TIMEOUT_SECONDS", "60")
 
 		cfg, err := config.Load(agentDefaults)
 		Expect(err).NotTo(HaveOccurred())
@@ -52,10 +54,11 @@ var _ = Describe("Configuration", func() {
 		Expect(cfg.ExternalServiceType).To(Equal("LoadBalancer"))
 		Expect(cfg.DefaultStorageClass).To(Equal("az-a"))
 		Expect(cfg.ImageCatalog).To(Equal("psql-images"))
-		Expect(cfg.DefaultVersion).To(Equal(16))
+		Expect(cfg.DefaultVersion).To(Equal("16"))
 		Expect(cfg.DebounceMs).To(Equal(250))
 		Expect(cfg.ResyncPeriod).To(Equal(5 * time.Minute))
 		Expect(cfg.PublishMaxAttempts).To(Equal(10))
+		Expect(cfg.PublishTimeoutSeconds).To(Equal(60))
 	})
 
 	It("applies default values when no config is specified", func() {
@@ -66,10 +69,11 @@ var _ = Describe("Configuration", func() {
 		Expect(cfg).NotTo(BeNil())
 
 		Expect(cfg.Namespace).To(Equal("default"))
-		Expect(cfg.DefaultVersion).To(Equal(18))
+		Expect(cfg.DefaultVersion).To(Equal("18"))
 		Expect(cfg.DebounceMs).To(Equal(500))
 		Expect(cfg.ResyncPeriod).To(Equal(10 * time.Minute))
 		Expect(cfg.PublishMaxAttempts).To(Equal(5))
+		Expect(cfg.PublishTimeoutSeconds).To(Equal(30))
 	})
 
 	It("returns error when messaging URL is missing", func() {
@@ -113,5 +117,14 @@ var _ = Describe("Configuration", func() {
 		Expect(cfg).To(BeNil())
 		Expect(err.Error()).To(ContainSubstring("invalid SP_DATABASE_EXTERNAL_SVC_TYPE"))
 		Expect(err.Error()).To(ContainSubstring("must be LoadBalancer or NodePort"))
+	})
+
+	It("loads SP_MONITOR_PUBLISH_TIMEOUT_SECONDS from environment", func() {
+		_ = os.Setenv("SP_DATABASE_EXTERNAL_SVC_TYPE", "NodePort")
+		_ = os.Setenv("SP_MONITOR_PUBLISH_TIMEOUT_SECONDS", "120")
+
+		cfg, err := config.Load(agentDefaults)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg.PublishTimeoutSeconds).To(Equal(120))
 	})
 })

@@ -18,6 +18,13 @@ const (
 	jobRoleLabel          = "cnpg.io/jobRole"
 )
 
+// transientWaitingReasons are ordinary initialization states that do not
+// indicate a rollout failure; pods in these states should remain PENDING.
+var transientWaitingReasons = map[string]bool{
+	"ContainerCreating": true,
+	"PodInitializing":   true,
+}
+
 // ReconcileStatus derives the DCM database status from the current state of a
 // CNPG Cluster and its associated instance pods and PVCs. It returns the
 // status, a human-readable message, and whether the result should be published.
@@ -29,6 +36,9 @@ func ReconcileStatus(cluster *cnpgv1.Cluster, pods []*corev1.Pod, pvcs []*corev1
 	// Stuck-rollout detection takes precedence over pod-phase mapping and is
 	// evaluated regardless of Pod existence.
 	if cluster != nil {
+		if cluster.DeletionTimestamp != nil {
+			return v1alpha1.DELETING, "cluster deleting", true
+		}
 		if status, msg, ok := stuckRolloutStatus(cluster, pods); ok {
 			return status, msg, true
 		}
@@ -42,13 +52,12 @@ func ReconcileStatus(cluster *cnpgv1.Cluster, pods []*corev1.Pod, pvcs []*corev1
 		}
 	}
 
-	// Filter pods before MatchReplicas: job pods (cnpg.io/jobRole) have no PVCs
-	// and would cause a mismatch error; Succeeded pods are similarly excluded
-	// and their PVCs dropped so pairing stays consistent.
+	// Filter pods before MatchReplicas: Non instance pods would have no PVC
+	// and would cause a mismatch error
 	var resolvedPods []corev1.Pod
 	excludedPodNames := make(map[string]struct{})
 	for _, pod := range pods {
-		if _, isJob := pod.Labels[jobRoleLabel]; isJob || pod.Status.Phase == corev1.PodSucceeded {
+		if podRoleInstance != pod.Labels[podRoleLabel] {
 			excludedPodNames[pod.Name] = struct{}{}
 			continue
 		}
@@ -183,7 +192,7 @@ func extractPodFailureReason(pod *corev1.Pod) string {
 		// for actionable reasons such as ErrImagePull or ImagePullBackOff.
 	}
 	for _, cs := range pod.Status.ContainerStatuses {
-		if cs.State.Waiting != nil && cs.State.Waiting.Reason != "" {
+		if cs.State.Waiting != nil && cs.State.Waiting.Reason != "" && !transientWaitingReasons[cs.State.Waiting.Reason] {
 			return cs.State.Waiting.Reason
 		}
 		if cs.State.Terminated != nil && cs.State.Terminated.Reason != "" && cs.State.Terminated.ExitCode != 0 {

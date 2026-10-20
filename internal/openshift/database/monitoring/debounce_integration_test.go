@@ -17,10 +17,11 @@ var _ = Describe("Status Monitor", func() {
 			var mu sync.Mutex
 			var published []monitoring.StatusEvent
 
-			debouncer := monitoring.NewDebouncer(100*time.Millisecond, func(event monitoring.StatusEvent) {
+			debouncer := monitoring.NewDebouncer(100*time.Millisecond, func(event monitoring.StatusEvent) bool {
 				mu.Lock()
 				defer mu.Unlock()
 				published = append(published, event)
+				return true
 			})
 			defer debouncer.Stop()
 			debouncer.SetReady()
@@ -52,10 +53,11 @@ var _ = Describe("Status Monitor", func() {
 			var mu sync.Mutex
 			var published []monitoring.StatusEvent
 
-			debouncer := monitoring.NewDebouncer(100*time.Millisecond, func(event monitoring.StatusEvent) {
+			debouncer := monitoring.NewDebouncer(100*time.Millisecond, func(event monitoring.StatusEvent) bool {
 				mu.Lock()
 				defer mu.Unlock()
 				published = append(published, event)
+				return true
 			})
 			defer debouncer.Stop()
 			debouncer.SetReady()
@@ -95,10 +97,11 @@ var _ = Describe("Status Monitor", func() {
 			var mu sync.Mutex
 			var published []monitoring.StatusEvent
 
-			debouncer := monitoring.NewDebouncer(100*time.Millisecond, func(event monitoring.StatusEvent) {
+			debouncer := monitoring.NewDebouncer(100*time.Millisecond, func(event monitoring.StatusEvent) bool {
 				mu.Lock()
 				defer mu.Unlock()
 				published = append(published, event)
+				return true
 			})
 			defer debouncer.Stop()
 			debouncer.SetReady()
@@ -132,9 +135,10 @@ var _ = Describe("Status Monitor", func() {
 			publishStarted := make(chan struct{})
 			publishComplete := make(chan struct{})
 
-			debouncer := monitoring.NewDebouncer(10*time.Millisecond, func(_ monitoring.StatusEvent) {
+			debouncer := monitoring.NewDebouncer(10*time.Millisecond, func(_ monitoring.StatusEvent) bool {
 				close(publishStarted)
 				<-publishComplete
+				return true
 			})
 			debouncer.SetReady()
 
@@ -164,8 +168,9 @@ var _ = Describe("Status Monitor", func() {
 
 			// After Stop, no further publishes should occur.
 			var postStopPublished atomic.Int32
-			debouncer2 := monitoring.NewDebouncer(10*time.Millisecond, func(_ monitoring.StatusEvent) {
+			debouncer2 := monitoring.NewDebouncer(10*time.Millisecond, func(_ monitoring.StatusEvent) bool {
 				postStopPublished.Add(1)
+				return true
 			})
 			debouncer2.SetReady()
 			debouncer2.Stop()
@@ -185,10 +190,11 @@ var _ = Describe("Status Monitor", func() {
 			var publishTimes []time.Time
 
 			debounce := 100 * time.Millisecond
-			debouncer := monitoring.NewDebouncer(debounce, func(_ monitoring.StatusEvent) {
+			debouncer := monitoring.NewDebouncer(debounce, func(_ monitoring.StatusEvent) bool {
 				mu.Lock()
 				defer mu.Unlock()
 				publishTimes = append(publishTimes, time.Now())
+				return true
 			})
 			defer debouncer.Stop()
 			debouncer.SetReady()
@@ -219,10 +225,11 @@ var _ = Describe("Status Monitor", func() {
 			var mu sync.Mutex
 			var published []monitoring.StatusEvent
 
-			debouncer := monitoring.NewDebouncer(50*time.Millisecond, func(event monitoring.StatusEvent) {
+			debouncer := monitoring.NewDebouncer(50*time.Millisecond, func(event monitoring.StatusEvent) bool {
 				mu.Lock()
 				defer mu.Unlock()
 				published = append(published, event)
+				return true
 			})
 			defer debouncer.Stop()
 			debouncer.SetReady()
@@ -261,10 +268,11 @@ var _ = Describe("Status Monitor", func() {
 			var mu sync.Mutex
 			var published []monitoring.StatusEvent
 
-			debouncer := monitoring.NewDebouncer(500*time.Millisecond, func(event monitoring.StatusEvent) {
+			debouncer := monitoring.NewDebouncer(500*time.Millisecond, func(event monitoring.StatusEvent) bool {
 				mu.Lock()
 				defer mu.Unlock()
 				published = append(published, event)
+				return true
 			})
 			debouncer.SetReady()
 
@@ -286,6 +294,51 @@ var _ = Describe("Status Monitor", func() {
 			Expect(statuses).To(HaveKeyWithValue("inst-2", v1alpha1.FAILED))
 		})
 
+		It("should allow a resync to retry an event that previously failed to publish", func() {
+			// If publishFn returns false (all retries exhausted), the event must NOT
+			// be recorded in lastPublished. A subsequent resync with the same event
+			// must be queued and re-attempted rather than silently dropped.
+			var mu sync.Mutex
+			var published []monitoring.StatusEvent
+			var publishCount atomic.Int32
+
+			debounce := 50 * time.Millisecond
+			debouncer := monitoring.NewDebouncer(debounce, func(event monitoring.StatusEvent) bool {
+				n := publishCount.Add(1)
+				if n == 1 {
+					return false // first attempt fails
+				}
+				mu.Lock()
+				defer mu.Unlock()
+				published = append(published, event)
+				return true
+			})
+			defer debouncer.Stop()
+			debouncer.SetReady()
+
+			event := monitoring.StatusEvent{InstanceID: "inst-1", Status: v1alpha1.RUNNING}
+
+			// First submission — publishFn fails, must not record as delivered.
+			debouncer.Submit("inst-1", event)
+			time.Sleep(3 * debounce)
+
+			Expect(publishCount.Load()).To(Equal(int32(1)), "first publish attempt should have fired")
+
+			mu.Lock()
+			firstCount := len(published)
+			mu.Unlock()
+			Expect(firstCount).To(Equal(0), "failed publish must not be recorded as delivered")
+
+			// Resync with same event — must be re-queued and succeed.
+			debouncer.Submit("inst-1", event)
+			time.Sleep(3 * debounce)
+
+			mu.Lock()
+			defer mu.Unlock()
+			Expect(published).To(HaveLen(1), "resync after failed publish must be retried and recorded")
+			Expect(published[0].Status).To(Equal(v1alpha1.RUNNING))
+		})
+
 		It("should suppress submissions until SetReady is called", func() {
 			// Simulates informers where one cache is slower than the debounce interval:
 			// events submitted before SetReady must never be queued, so the
@@ -294,10 +347,11 @@ var _ = Describe("Status Monitor", func() {
 			var published []monitoring.StatusEvent
 
 			debounce := 50 * time.Millisecond
-			debouncer := monitoring.NewDebouncer(debounce, func(event monitoring.StatusEvent) {
+			debouncer := monitoring.NewDebouncer(debounce, func(event monitoring.StatusEvent) bool {
 				mu.Lock()
 				defer mu.Unlock()
 				published = append(published, event)
+				return true
 			})
 			defer debouncer.Stop()
 

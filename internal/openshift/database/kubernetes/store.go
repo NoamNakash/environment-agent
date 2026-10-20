@@ -141,21 +141,37 @@ func (s *CnpgDatabaseStore) enrichFromCluster(
 	}
 
 	// for v1, updates are not supported, so the case of rolling update is irrelevant
-	if len(pods.Items) != len(pvcs.Items) {
+	// checks deletion timestamp to see if the cluster is in the process of being deleted,
+	// where it would make sense for pods not to match PVCs
+	if len(pods.Items) != len(pvcs.Items) && cluster.DeletionTimestamp == nil {
 		return &store.ConflictError{Message: "database has mismatched pods/pvcs"}
 	}
 
-	if len(pods.Items) == 0 {
-		db.Status = ptr.To(v1alpha1.PENDING)
+	if cluster.DeletionTimestamp == nil {
+		if len(pods.Items) == 0 {
+			db.Status = ptr.To(v1alpha1.PENDING)
+			if t := latestClusterTransitionTime(*cluster); t != nil {
+				db.UpdateTime = t
+			}
+		} else {
+			replicas, err := MatchReplicas(pods.Items, pvcs.Items)
+			if err != nil {
+				return err
+			}
+			enrichWithReplicas(db, replicas)
+		}
+	} else {
+		db.Status = ptr.To(v1alpha1.DELETING)
 		if t := latestClusterTransitionTime(*cluster); t != nil {
 			db.UpdateTime = t
 		}
-	} else {
-		replicas, err := MatchReplicas(pods.Items, pvcs.Items)
-		if err != nil {
-			return err
+		for _, pod := range pods.Items {
+			for _, cond := range pod.Status.Conditions {
+				if !cond.LastTransitionTime.IsZero() && (db.UpdateTime == nil || cond.LastTransitionTime.After(*db.UpdateTime)) {
+					db.UpdateTime = &cond.LastTransitionTime.Time
+				}
+			}
 		}
-		enrichWithReplicas(db, replicas)
 	}
 
 	credentialsSecretName := credentialSecretFromCluster(cluster)

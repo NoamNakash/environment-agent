@@ -19,7 +19,7 @@ import (
 // (preventing redundant re-publication on resync), it is dropped.
 type Debouncer struct {
 	interval      time.Duration
-	publishFn     func(StatusEvent)
+	publishFn     func(StatusEvent) bool
 	mu            sync.Mutex
 	wg            sync.WaitGroup
 	timers        map[string]*time.Timer
@@ -33,7 +33,10 @@ type Debouncer struct {
 // NewDebouncer creates a Debouncer with the given interval and publish callback.
 // Call SetReady before submitting events in production; the gate exists so
 // partial-cache events during informer startup are never queued.
-func NewDebouncer(interval time.Duration, publishFn func(StatusEvent)) *Debouncer {
+func NewDebouncer(interval time.Duration, publishFn func(StatusEvent) bool) *Debouncer {
+	if publishFn == nil {
+		panic("monitoring: publishFn is required")
+	}
 	return &Debouncer{
 		interval:      interval,
 		publishFn:     publishFn,
@@ -104,11 +107,14 @@ func (d *Debouncer) Submit(instanceID string, event StatusEvent) {
 		delete(d.timers, instanceID)
 		delete(d.gens, instanceID)
 		delete(d.pendingEvent, instanceID)
-		d.lastPublished[instanceID] = event
 		d.wg.Add(1)
 		d.mu.Unlock()
 		defer d.wg.Done()
-		d.publishFn(event)
+		if d.publishFn(event) {
+			d.mu.Lock()
+			d.lastPublished[instanceID] = event
+			d.mu.Unlock()
+		}
 	})
 }
 
@@ -143,7 +149,8 @@ func (d *Debouncer) Stop() {
 	d.wg.Wait()
 
 	// Flush events whose timers were cancelled, using the still-valid publishFn.
+	// Success is not tracked here — the debouncer is shutting down.
 	for _, event := range pending {
-		d.publishFn(event)
+		_ = d.publishFn(event)
 	}
 }

@@ -162,6 +162,8 @@ func userLabelsFromCluster(cluster *cnpgv1.Cluster) map[string]string {
 // StatusHigherPriority compares two statuses and consolidates into one status
 // as described in https://github.com/dcm-project/enhancements/blob/main/enhancements/cloudnative-pg-database-sp/cloudnative-pg-sp.md#status-mapping-from-kubernetes-to-dcm
 func StatusHigherPriority(status1, status2 v1alpha1.DatabaseStatus) v1alpha1.DatabaseStatus {
+	// This function refers to per-replica status, so the
+	// DELETING status is not relevant for it.
 	statuses := []v1alpha1.DatabaseStatus{
 		v1alpha1.DELETED,
 		v1alpha1.RUNNING,

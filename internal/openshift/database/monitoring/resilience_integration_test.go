@@ -167,8 +167,11 @@ var _ = Describe("Status Monitor", func() {
 			_, err = dynClient.Resource(k8sutils.ClustersResource).Namespace("default").Create(ctx, &unstructured.Unstructured{Object: clusterMap}, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			// Wait long enough for all retries to exhaust with backoff.
-			time.Sleep(1 * time.Second)
+			// Wait long enough for the first publishing round (2 attempts with 10ms
+			// backoff ≈ 10ms), but less than one resync period (1s) so we see only
+			// the first round. A failed publish is no longer recorded as delivered,
+			// so subsequent resyncs will re-queue the event — but they haven't fired yet.
+			time.Sleep(300 * time.Millisecond)
 
 			// With PublishMaxAttempts=2, exactly 2 attempts should be made — not 5.
 			Expect(failPublisher.attempts.Load()).To(Equal(int32(2)),
