@@ -287,7 +287,6 @@ func reconcileAndSubmit(instanceID string, cluster *cnpgv1.Cluster, pods []*core
 	}
 }
 
-<<<<<<< HEAD
 func (m *StatusMonitor) publishTimeout() time.Duration {
 	if m.cfg.PublishTimeoutSeconds > 0 {
 		return time.Duration(m.cfg.PublishTimeoutSeconds) * time.Second
@@ -295,8 +294,6 @@ func (m *StatusMonitor) publishTimeout() time.Duration {
 	return 30 * time.Second
 }
 
-=======
->>>>>>> 184c5c4 (FLPATH-4884: fix(database) address comments from #78 relating to monitoring package)
 func (m *StatusMonitor) publishWithRetry(ctx context.Context, event StatusEvent) bool {
 	maxAttempts := m.cfg.PublishMaxAttempts
 	if maxAttempts <= 0 {
