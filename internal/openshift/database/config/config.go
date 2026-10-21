@@ -14,14 +14,15 @@ const defaultProviderName = "database"
 // Config is the root configuration for the service provider.
 type Config struct {
 	shared.Config
-	Namespace           string        `env:"SP_DATABASE_NAMESPACE" envDefault:"default"`
-	DefaultStorageClass string        `env:"SP_DATABASE_DEFAULT_STORAGE_CLASS"`
-	ImageCatalog        string        `env:"SP_DATABASE_IMAGE_CATALOG"`
-	ExternalServiceType string        `env:"SP_DATABASE_EXTERNAL_SVC_TYPE"` // Must be NodePort or LoadBalancer
-	DefaultVersion      int           `env:"SP_DATABASE_DEFAULT_VERSION" envDefault:"18"`
-	DebounceMs          int           `env:"SP_MONITOR_DEBOUNCE_MS"   envDefault:"500"`
-	ResyncPeriod        time.Duration `env:"SP_MONITOR_RESYNC_PERIOD" envDefault:"10m"`
-	PublishMaxAttempts  int           `env:"SP_MONITOR_PUBLISH_MAX_ATTEMPTS" envDefault:"5"`
+	Namespace             string        `env:"SP_DATABASE_NAMESPACE" envDefault:"default"`
+	DefaultStorageClass   string        `env:"SP_DATABASE_DEFAULT_STORAGE_CLASS"`
+	ImageCatalog          string        `env:"SP_DATABASE_IMAGE_CATALOG"`
+	ExternalServiceType   string        `env:"SP_DATABASE_EXTERNAL_SVC_TYPE"` // Must be NodePort or LoadBalancer
+	DefaultVersion        string        `env:"SP_DATABASE_DEFAULT_VERSION" envDefault:"18"`
+	DebounceMs            int           `env:"SP_MONITOR_DEBOUNCE_MS"              envDefault:"500"`
+	ResyncPeriod          time.Duration `env:"SP_MONITOR_RESYNC_PERIOD"            envDefault:"10m"`
+	PublishMaxAttempts    int           `env:"SP_MONITOR_PUBLISH_MAX_ATTEMPTS"     envDefault:"5"`
+	PublishTimeoutSeconds int           `env:"SP_MONITOR_PUBLISH_TIMEOUT_SECONDS"  envDefault:"30"`
 }
 
 // Load reads configuration from environment variables.

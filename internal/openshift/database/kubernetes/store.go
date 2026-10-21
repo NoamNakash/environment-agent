@@ -21,10 +21,10 @@ import (
 
 const (
 	dataVolumeName = "pgdata"
-	instanceLabel  = "cnpg.io/instanceName"
+	InstanceLabel  = "cnpg.io/instanceName"
 )
 
-var clustersResource = schema.GroupVersionResource{
+var ClustersResource = schema.GroupVersionResource{
 	Group:    "postgresql.cnpg.io",
 	Version:  "v1",
 	Resource: "clusters",
@@ -60,7 +60,7 @@ func (s *CnpgDatabaseStore) CheckHealth(ctx context.Context) error {
 
 // findCluster looks up the single cluster for a database instance.
 func (s *CnpgDatabaseStore) findCluster(ctx context.Context, databaseId string) (*cnpgv1.Cluster, error) {
-	clusters, err := s.dynamicClient.Resource(clustersResource).Namespace(s.cfg.Namespace).List(ctx, metav1.ListOptions{
+	clusters, err := s.dynamicClient.Resource(ClustersResource).Namespace(s.cfg.Namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: instanceSelector(databaseId),
 	})
 	if err != nil {
@@ -92,11 +92,11 @@ func (s *CnpgDatabaseStore) buildDatabase(ctx context.Context, cluster *cnpgv1.C
 	return
 }
 
-// matchReplicas matches the pods and pvcs into temporary databaseReplica objects
+// MatchReplicas matches the pods and pvcs into temporary databaseReplica objects
 // that each contain the pod and it's matching pgdata volume
-func matchReplicas(pods []corev1.Pod, pvcs []corev1.PersistentVolumeClaim) (replicas []databaseReplica, err error) {
+func MatchReplicas(pods []corev1.Pod, pvcs []corev1.PersistentVolumeClaim) (replicas []databaseReplica, err error) {
 	for _, pvc := range pvcs {
-		podName, ok := pvc.Labels[instanceLabel]
+		podName, ok := pvc.Labels[InstanceLabel]
 		if !ok {
 			return nil, &store.ConflictError{Message: "database has mismatched pods/pvcs"}
 		}
@@ -141,21 +141,37 @@ func (s *CnpgDatabaseStore) enrichFromCluster(
 	}
 
 	// for v1, updates are not supported, so the case of rolling update is irrelevant
-	if len(pods.Items) != len(pvcs.Items) {
+	// checks deletion timestamp to see if the cluster is in the process of being deleted,
+	// where it would make sense for pods not to match PVCs
+	if len(pods.Items) != len(pvcs.Items) && cluster.DeletionTimestamp == nil {
 		return &store.ConflictError{Message: "database has mismatched pods/pvcs"}
 	}
 
-	if len(pods.Items) == 0 {
-		db.Status = ptr.To(v1alpha1.PENDING)
+	if cluster.DeletionTimestamp == nil {
+		if len(pods.Items) == 0 {
+			db.Status = ptr.To(v1alpha1.PENDING)
+			if t := latestClusterTransitionTime(*cluster); t != nil {
+				db.UpdateTime = t
+			}
+		} else {
+			replicas, err := MatchReplicas(pods.Items, pvcs.Items)
+			if err != nil {
+				return err
+			}
+			enrichWithReplicas(db, replicas)
+		}
+	} else {
+		db.Status = ptr.To(v1alpha1.DELETING)
 		if t := latestClusterTransitionTime(*cluster); t != nil {
 			db.UpdateTime = t
 		}
-	} else {
-		replicas, err := matchReplicas(pods.Items, pvcs.Items)
-		if err != nil {
-			return err
+		for _, pod := range pods.Items {
+			for _, cond := range pod.Status.Conditions {
+				if !cond.LastTransitionTime.IsZero() && (db.UpdateTime == nil || cond.LastTransitionTime.After(*db.UpdateTime)) {
+					db.UpdateTime = &cond.LastTransitionTime.Time
+				}
+			}
 		}
-		enrichWithReplicas(db, replicas)
 	}
 
 	credentialsSecretName := credentialSecretFromCluster(cluster)

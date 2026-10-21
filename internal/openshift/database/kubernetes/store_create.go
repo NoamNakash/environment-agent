@@ -69,7 +69,7 @@ func (s *CnpgDatabaseStore) Create(ctx context.Context, spec v1alpha1.DatabaseSp
 		return nil, fmt.Errorf("encoding cluster for database %q: %w", id, err)
 	}
 	clusterUnstructured := &unstructured.Unstructured{Object: clusterMap}
-	clusterUnstructured, err = s.dynamicClient.Resource(clustersResource).Namespace(s.cfg.Namespace).Create(ctx, clusterUnstructured, metav1.CreateOptions{})
+	clusterUnstructured, err = s.dynamicClient.Resource(ClustersResource).Namespace(s.cfg.Namespace).Create(ctx, clusterUnstructured, metav1.CreateOptions{})
 	if err != nil {
 		deleteSecret()
 		if apierrors.IsAlreadyExists(err) {

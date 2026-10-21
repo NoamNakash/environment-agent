@@ -21,7 +21,6 @@ import (
 
 const (
 	engine                             = "postgresql"
-	postgresLatest                     = "latest"
 	port                               = 5432 // As of it right now, it is not possible to reconfigure cnpg's port
 	imageRepo                          = "ghcr.io/cloudnative-pg/postgresql"
 	imageType                          = "standard"
@@ -44,10 +43,11 @@ type databaseReplicaPhase struct {
 	PvcPhase corev1.PersistentVolumeClaimPhase
 }
 
-// mapReplicaStatus maps a Kubernetes Pod phase and PVC phase to a database status.
+// MapReplicaStatus maps a Kubernetes Pod phase and PVC phase to a database status.
 // Returns the mapped status and true if mapping exists, or ("", false)
 // for phases that should be ignored (e.g., Succeeded per DD-020).
-func mapReplicaStatus(rpPhase databaseReplicaPhase) (v1alpha1.DatabaseStatus, bool) {
+func MapReplicaStatus(rp databaseReplica) (v1alpha1.DatabaseStatus, bool) {
+	rpPhase := phaseFromReplica(rp)
 	switch rpPhase.PodPhase {
 	case corev1.PodPending:
 		if rpPhase.PvcPhase != corev1.ClaimLost {
@@ -64,6 +64,14 @@ func mapReplicaStatus(rpPhase databaseReplicaPhase) (v1alpha1.DatabaseStatus, bo
 		// Succeeded and any unknown phases are not mapped
 		return "", false
 	}
+}
+
+func phaseFromReplica(replica databaseReplica) databaseReplicaPhase {
+	return databaseReplicaPhase{
+		PodPhase: replica.Pod.Status.Phase,
+		PvcPhase: replica.Pvc.Status.Phase,
+	}
+
 }
 
 // databaseFromCluster reconstructs an API database from a Kubernetes Cluster.
@@ -151,9 +159,11 @@ func userLabelsFromCluster(cluster *cnpgv1.Cluster) map[string]string {
 	return labels
 }
 
-// statusHigherPriority compares two statuses and consolidates into one status
+// StatusHigherPriority compares two statuses and consolidates into one status
 // as described in https://github.com/dcm-project/enhancements/blob/main/enhancements/cloudnative-pg-database-sp/cloudnative-pg-sp.md#status-mapping-from-kubernetes-to-dcm
-func statusHigherPriority(status1, status2 v1alpha1.DatabaseStatus) v1alpha1.DatabaseStatus {
+func StatusHigherPriority(status1, status2 v1alpha1.DatabaseStatus) v1alpha1.DatabaseStatus {
+	// This function refers to per-replica status, so the
+	// DELETING status is not relevant for it.
 	statuses := []v1alpha1.DatabaseStatus{
 		v1alpha1.DELETED,
 		v1alpha1.RUNNING,
@@ -181,15 +191,11 @@ func enrichWithReplicas(database *v1alpha1.Database, replicas []databaseReplica)
 	database.UpdateTime = database.CreateTime
 
 	for _, replica := range replicas {
-		replicaPhase := databaseReplicaPhase{
-			PodPhase: replica.Pod.Status.Phase,
-			PvcPhase: replica.Pvc.Status.Phase,
-		}
-		status, ok := mapReplicaStatus(replicaPhase)
+		status, ok := MapReplicaStatus(replica)
 		if !ok {
 			status = v1alpha1.UNKNOWN
 		}
-		database.Status = new(statusHigherPriority(*database.Status, status))
+		database.Status = new(StatusHigherPriority(*database.Status, status))
 
 		if t := latestReplicaTransitionTime(replica); t != nil {
 			database.UpdateTime = new(latestTime(database.UpdateTime, t))
