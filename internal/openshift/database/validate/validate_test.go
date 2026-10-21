@@ -55,4 +55,18 @@ var _ = Describe("ValidateCreate", func() {
 		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
 		Expect(err.Error()).To(ContainSubstring("reserved by DCM"))
 	})
+
+	It("rejects an uppercase metadata.name", func() {
+		spec := validSpec()
+		spec.Metadata.Name = "MyDatabase"
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("metadata.name"))
+	})
+
+	It("rejects an invalid resource ID", func() {
+		err := validate.ValidateCreate("INVALID_ID", validSpec())
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("database ID"))
+	})
 })

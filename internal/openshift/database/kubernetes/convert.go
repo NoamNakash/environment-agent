@@ -71,7 +71,6 @@ func phaseFromReplica(replica databaseReplica) databaseReplicaPhase {
 		PodPhase: replica.Pod.Status.Phase,
 		PvcPhase: replica.Pvc.Status.Phase,
 	}
-
 }
 
 // databaseFromCluster reconstructs an API database from a Kubernetes Cluster.
@@ -129,7 +128,7 @@ func resourcesFromCluster(cluster cnpgv1.Cluster) (res v1alpha1.DatabaseResource
 	if cluster.Spec.StorageConfiguration.Size != "" {
 		if q, err := resource.ParseQuantity(cluster.Spec.StorageConfiguration.Size); err == nil {
 			storageStr := units.BytesQuantityToAPI(q)
-			res.Storage = &storageStr
+			res.Storage = storageStr
 		}
 	}
 	return res
@@ -393,7 +392,7 @@ func buildCluster(spec v1alpha1.DatabaseSpec, id string, cfg CnpgK8sConfig, labe
 	}
 
 	// Storage resource - errors handled upstream
-	storageSize, err := units.ConvertBytes(*spec.Resources.Storage)
+	storageSize, err := units.ConvertBytes(spec.Resources.Storage)
 	if err != nil {
 		return nil, &store.InvalidArgumentError{Message: fmt.Sprintf("invalid storage value: %v", err)}
 	}
