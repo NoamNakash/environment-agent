@@ -15,8 +15,9 @@ var _ = Describe("ValidateCreate", func() {
 		return databaseapi.DatabaseSpec{
 			Metadata: databaseapi.DatabaseMetadata{Name: "my-database"},
 			Resources: databaseapi.DatabaseResources{
-				Cpu:    databaseapi.DatabaseCpu{Min: "1", Max: "2"},
-				Memory: databaseapi.DatabaseMemory{Min: "1GB", Max: "2GB"},
+				Cpu:     databaseapi.DatabaseCpu{Min: "1", Max: "2"},
+				Memory:  databaseapi.DatabaseMemory{Min: "1GB", Max: "2GB"},
+				Storage: "30GB",
 			},
 		}
 	}
@@ -68,5 +69,29 @@ var _ = Describe("ValidateCreate", func() {
 		err := validate.ValidateCreate("INVALID_ID", validSpec())
 		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
 		Expect(err.Error()).To(ContainSubstring("database ID"))
+	})
+
+	It("rejects an unrecognised storage unit", func() {
+		spec := validSpec()
+		spec.Resources.Storage = "not-storage"
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("storage"))
+	})
+
+	It("rejects zero storage", func() {
+		spec := validSpec()
+		spec.Resources.Storage = "0GB"
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("storage"))
+	})
+
+	It("rejects missing storage", func() {
+		spec := validSpec()
+		spec.Resources.Storage = ""
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("storage"))
 	})
 })

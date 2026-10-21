@@ -26,6 +26,7 @@ const (
 	ptrCPUMax       = "#/spec/resources/cpu/max"
 	ptrMemMin       = "#/spec/resources/memory/min"
 	ptrMemMax       = "#/spec/resources/memory/max"
+	ptrStorage      = "#/spec/resources/storage"
 )
 
 func jsonPointerEscape(s string) string {
@@ -106,6 +107,14 @@ func checkResources(res v1alpha1.DatabaseResources) []validationError {
 		errs = append(errs, validationError{
 			Detail:  fmt.Sprintf("memory.min (%s) must not exceed memory.max (%s)", res.Memory.Min, res.Memory.Max),
 			Pointer: ptrMemMin,
+		})
+	}
+
+	storage, storageErr := units.ConvertBytes(res.Storage)
+	if storageErr != nil || storage.String() == "0" {
+		errs = append(errs, validationError{
+			Detail:  fmt.Sprintf("invalid storage %q: %v", res.Storage, storageErr),
+			Pointer: ptrStorage,
 		})
 	}
 
