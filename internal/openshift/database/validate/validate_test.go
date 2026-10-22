@@ -1,6 +1,8 @@
 package validate_test
 
 import (
+	"strings"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -65,8 +67,31 @@ var _ = Describe("ValidateCreate", func() {
 		Expect(err.Error()).To(ContainSubstring("metadata.name"))
 	})
 
+	It("rejects a dotted metadata.name", func() {
+		spec := validSpec()
+		spec.Metadata.Name = "my.database"
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("metadata.name"))
+	})
+
+	It("rejects a metadata.name longer than 63 characters", func() {
+		spec := validSpec()
+		spec.Metadata.Name = "a" + strings.Repeat("b", 63) // 64 chars
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("metadata.name"))
+	})
+
 	It("rejects an invalid resource ID", func() {
 		err := validate.ValidateCreate("INVALID_ID", validSpec())
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("database ID"))
+	})
+
+	It("rejects a resource ID longer than 63 characters", func() {
+		longID := "a" + strings.Repeat("b", 63) // 64 chars
+		err := validate.ValidateCreate(longID, validSpec())
 		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
 		Expect(err.Error()).To(ContainSubstring("database ID"))
 	})
@@ -90,6 +115,46 @@ var _ = Describe("ValidateCreate", func() {
 	It("rejects missing storage", func() {
 		spec := validSpec()
 		spec.Resources.Storage = ""
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("storage"))
+	})
+
+	It("rejects negative cpu.min", func() {
+		spec := validSpec()
+		spec.Resources.Cpu.Min = "-1"
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("cpu.min"))
+	})
+
+	It("rejects negative cpu.max", func() {
+		spec := validSpec()
+		spec.Resources.Cpu.Max = "-1"
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("cpu.max"))
+	})
+
+	It("rejects negative memory.min", func() {
+		spec := validSpec()
+		spec.Resources.Memory.Min = "-1GB"
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("memory.min"))
+	})
+
+	It("rejects negative memory.max", func() {
+		spec := validSpec()
+		spec.Resources.Memory.Max = "-1GB"
+		err := validate.ValidateCreate("database-1", spec)
+		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
+		Expect(err.Error()).To(ContainSubstring("memory.max"))
+	})
+
+	It("rejects negative storage", func() {
+		spec := validSpec()
+		spec.Resources.Storage = "-10GB"
 		err := validate.ValidateCreate("database-1", spec)
 		Expect(err).To(BeAssignableToTypeOf(&store.InvalidArgumentError{}))
 		Expect(err.Error()).To(ContainSubstring("storage"))

@@ -39,10 +39,17 @@ var k8sToAPI = map[string]string{
 func ConvertBytes(bytesStr string) (resource.Quantity, error) {
 	for suffix, k8sUnit := range apiToK8s {
 		if numStr, ok := strings.CutSuffix(bytesStr, suffix); ok {
-			return resource.ParseQuantity(numStr + k8sUnit)
+			q, err := resource.ParseQuantity(numStr + k8sUnit)
+			if err != nil {
+				return resource.Quantity{}, err
+			}
+			if q.Sign() == -1 {
+				return resource.Quantity{}, fmt.Errorf("unsupported negative resource %q", bytesStr)
+			}
+			return q, nil
 		}
 	}
-	return resource.Quantity{}, fmt.Errorf("unsupported memory unit in %q", bytesStr)
+	return resource.Quantity{}, fmt.Errorf("unsupported unit in %q", bytesStr)
 }
 
 // BytesQuantityToAPI converts a Kubernetes resource.Quantity to an API bytes

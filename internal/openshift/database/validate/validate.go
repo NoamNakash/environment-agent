@@ -46,7 +46,7 @@ func checkDatabaseID(id string) *validationError {
 			Pointer: ptrDatabaseID,
 		}
 	}
-	if msgs := k8svalidation.IsDNS1123Subdomain(id); len(msgs) > 0 {
+	if msgs := k8svalidation.IsDNS1123Label(id); len(msgs) > 0 {
 		return &validationError{
 			Detail:  fmt.Sprintf("database ID %q is invalid: %s", id, strings.Join(msgs, "; ")),
 			Pointer: ptrDatabaseID,
@@ -56,7 +56,7 @@ func checkDatabaseID(id string) *validationError {
 }
 
 func checkMetadataName(name string) *validationError {
-	if msgs := k8svalidation.IsDNS1123Subdomain(name); len(msgs) > 0 {
+	if msgs := k8svalidation.IsDNS1123Label(name); len(msgs) > 0 {
 		return &validationError{
 			Detail:  fmt.Sprintf("metadata.name %q is invalid: %s", name, strings.Join(msgs, "; ")),
 			Pointer: ptrMetadataName,
@@ -74,11 +74,22 @@ func checkResources(res v1alpha1.DatabaseResources) []validationError {
 			Detail:  fmt.Sprintf("invalid cpu.min %q: %v", res.Cpu.Min, minCPUErr),
 			Pointer: ptrCPUMin,
 		})
+	} else if minCPU.Sign() == -1 {
+		errs = append(errs, validationError{
+			Detail:  fmt.Sprintf("cpu.min %q must not be negative", res.Cpu.Min),
+			Pointer: ptrCPUMin,
+		})
 	}
+
 	maxCPU, maxCPUErr := resource.ParseQuantity(res.Cpu.Max)
 	if maxCPUErr != nil {
 		errs = append(errs, validationError{
 			Detail:  fmt.Sprintf("invalid cpu.max %q: %v", res.Cpu.Max, maxCPUErr),
+			Pointer: ptrCPUMax,
+		})
+	} else if maxCPU.Sign() == -1 {
+		errs = append(errs, validationError{
+			Detail:  fmt.Sprintf("cpu.max %q must not be negative", res.Cpu.Max),
 			Pointer: ptrCPUMax,
 		})
 	}

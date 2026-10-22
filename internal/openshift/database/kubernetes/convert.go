@@ -378,7 +378,11 @@ func buildCluster(spec v1alpha1.DatabaseSpec, id string, cfg CnpgK8sConfig, labe
 	}
 
 	// CPU resources
-	cpuReq, cpuLim := units.ConvertCPU(spec.Resources.Cpu)
+	cpuReq, cpuLim, reqErr, limErr := units.ConvertCPU(spec.Resources.Cpu)
+	if reqErr != nil || limErr != nil {
+		// errors handled upstream, shouldn't be reachable
+		return nil, &store.InvalidArgumentError{Message: fmt.Sprintf("invalid cpu values: %v, %v", reqErr, limErr)}
+	}
 
 	// Memory resources — errors handled upstream; safe to ignore here since
 	// validation occurs before buildCluster is called.
